@@ -9,3 +9,12 @@ wheels/
 # Virtual environments
 .venv
 .venv311/
+
+# Large files and models
+*.mp4
+*.h5
+*.pt
+*.pth
+*.weights
+*.zip
+*.rar
