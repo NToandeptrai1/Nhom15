@@ -1,143 +1,102 @@
-import cv2 as cv
-import numpy as np
+import cv2
 import easyocr
-import os
+import numpy as np
 
-# 1. Configuration & Loading Models
-MODELS_DIR = "models"
-PROTOTXT = os.path.join(MODELS_DIR, "SSD_MobileNet.prototxt")
-MODEL = os.path.join(MODELS_DIR, "SSD_MobileNet.caffemodel")
-
-# Classes MobileNet-SSD can detect
-CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
-           "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
-           "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
-           "sofa", "train", "tvmonitor"]
-
-# Targets classes we want to box as "Cars"
-TARGET_CLASSES = ["car", "bus", "motorbike", "train"]
-
-print("[INFO] Loading SSD model...")
-net = cv.dnn.readNetFromCaffe(PROTOTXT, MODEL)
-
-print("[INFO] Initializing EasyOCR...")
-reader = easyocr.Reader(["en"], gpu=True)
-
-# 2. Reading Video
+# --- Cấu hình các tham số ---
+# Đường dẫn video của bạn
 video_path = 'plate2.mp4' 
-cap = cv.VideoCapture(video_path)
+# Tọa độ y của vạch kẻ giữa màn hình (giả sử là 350)
+line_y = 350 
+# Diện tích tối thiểu để được coi là một chiếc xe (điều chỉnh cho phù hợp)
+min_area = 4000 
+# Chiều cao của vùng crop biển số (so với chiều cao xe, vd: 1/3)
+plate_crop_ratio = 0.3
+# --- End Cấu hình ---
+
+# 1. Khởi tạo EasyOCR (load model đọc chữ, chỉ cần thực hiện 1 lần)
+reader = easyocr.Reader(['en'])
+
+# 2. Khởi tạo bộ lọc tách nền (MOG2) - thử giảm varThreshold để nhạy hơn
+backSub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
+
+cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
-    print(f"[ERROR] Could not open video: {video_path}")
+    print("Không thể mở video.")
     exit()
 
-def detect_plate(car_img):
-    """Refined plate detection using traditional OpenCV methods"""
-    if car_img is None or car_img.size == 0:
-        return None, None
-    
-    h, w = car_img.shape[:2]
-    # License plates are usually in the lower half of the car
-    roi = car_img[int(h*0.4):h, :]
-    
-    gray = cv.cvtColor(roi, cv.COLOR_BGR2GRAY)
-    # Apply filters to highlight plate-like regions
-    bfilter = cv.bilateralFilter(gray, 11, 17, 17)
-    edged = cv.Canny(bfilter, 30, 200)
-    
-    contours, _ = cv.findContours(edged.copy(), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    contours = sorted(contours, key=cv.contourArea, reverse=True)[:10]
-    
-    plate_contour = None
-    for c in contours:
-        peri = cv.arcLength(c, True)
-        approx = cv.approxPolyDP(c, 0.018 * peri, True)
-        if len(approx) == 4:
-            x, y, w_p, h_p = cv.boundingRect(c)
-            aspect_ratio = w_p / float(h_p)
-            # Standard license plates have aspect ratio between 2 and 5
-            if 2.0 < aspect_ratio < 5.5:
-                plate_contour = approx
-                break
-                
-    if plate_contour is not None:
-        px, py, pw, ph = cv.boundingRect(plate_contour)
-        # Shift py because we are in a ROI
-        actual_py = py + int(h*0.4)
-        return (px, actual_py, pw, ph), roi[py:py+ph, px:px+pw]
-    
-    return None, None
-
-print("[INFO] Starting detection loop...")
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
-    
-    (H, W) = frame.shape[:2]
-    
-    # Draw the yellow "counting/detection" line (horizontal)
-    line_y = int(H * 0.6)
-    cv.line(frame, (0, line_y), (W, line_y), (0, 255, 255), 3)
-    
-    # --- STEP 1: Detect Vehicles using SSD ---
-    # Create blob from frame
-    blob = cv.dnn.blobFromImage(cv.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
-    net.setInput(blob)
-    detections = net.forward()
-    
-    for i in range(0, detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-        
-        # Filter weak detections
-        if confidence > 0.4:
-            idx = int(detections[0, 0, i, 1])
-            
-            if CLASSES[idx] in TARGET_CLASSES:
-                # Get bounding box coordinates
-                box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
-                (startX, startY, endX, endY) = box.astype("int")
-                
-                # Validation of box
-                startX, startY = max(0, startX), max(0, startY)
-                endX, endY = min(W, endX), min(H, endY)
-                
-                # Draw Car Box (Yellow)
-                cv.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 255), 2)
-                
-                # --- STEP 2: Detect Plate inside Car BBox ---
-                car_roi = frame[startY:endY, startX:endX]
-                plate_box, plate_img = detect_plate(car_roi)
-                
-                if plate_box is not None:
-                    px, py, pw, ph = plate_box
-                    # Global coordinates for plate
-                    g_px, g_py = startX + px, startY + py
-                    
-                    # Draw Plate Box (Green)
-                    cv.rectangle(frame, (g_px, g_py), (g_px + pw, g_py + ph), (0, 255, 0), 2)
-                    
-                    # OCR
-                    if plate_img.size > 0:
-                        results = reader.readtext(plate_img, detail=0)
-                        plate_text = "".join(results).replace(" ", "").upper()
-                        
-                        # Labels: "BSX" in red and possibly the text
-                        # Draw "BSX" text above the plate box
-                        cv.putText(frame, "BSX", (g_px, g_py - 25), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                        if plate_text:
-                            cv.putText(frame, plate_text, (g_px, g_py - 5), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-    # Show result
-    cv.imshow('Vehicle & Plate Detection (Non-YOLO)', frame)
+    # --- TIỀN XỬ LÝ ẢNH ---
+    # 3. Lọc tách nền
+    fgMask = backSub.apply(frame)
     
-    # DEBUG: Save one frame to verify aesthetics
-    if not os.path.exists("debug_frame.jpg"):
-        cv.imwrite("debug_frame.jpg", frame)
+    # 4. Lọc nhiễu
+    # Giảm threshold để giữ lại nhiều chi tiết chuyển động hơn (vd: 200 thay vì 250)
+    _, fgMask = cv2.threshold(fgMask, 200, 255, cv2.THRESH_BINARY)
+    # Áp dụng xói mòn và giãn nở để lấp đầy các lỗ trống trong contour
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    fgMask = cv2.erode(fgMask, kernel, iterations=1)
+    fgMask = cv2.dilate(fgMask, kernel, iterations=2)
+
+    # --- PHÁT HIỆN XE (CHUYỂN ĐỘNG) ---
+    # 5. Tìm các đường bao (Contours)
+    contours, _ = cv2.findContours(fgMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    if cv.waitKey(1) & 0xFF == ord('q'):
+    # Vẽ line vàng mốc
+    cv2.line(frame, (0, line_y), (frame.shape[1], line_y), (0, 255, 255), 2)
+
+    detected_vehicles = []
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < min_area:
+            continue
+
+        x, y, w, h = cv2.boundingRect(contour)
+        
+        # --- LOGIC KIỂM TRA CROSSING ---
+        # 6. Kiểm tra nếu MÉP DƯỚI của xe đã VƯỢT QUA vạch
+        if (y + h) > line_y:
+            # Highlight line khi có xe vượt qua
+            cv2.line(frame, (0, line_y), (frame.shape[1], line_y), (0, 0, 255), 5)
+            
+            # Lưu thông tin xe đã detect để xử lý OCR sau (tránh duplicate vẽ)
+            detected_vehicles.append((x, y, w, h))
+
+    # --- NHẬN DIỆN BIỂN SỐ VÀ VẼ LABEL 'BXS' ---
+    for (x, y, w, h) in detected_vehicles:
+        # Vẽ BBox cho xe (Màu vàng theo yêu cầu)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 3)
+
+        # 7. Cắt vùng ảnh chứa biển số (Roi)
+        # Giả sử biển số nằm ở khoảng nửa dưới của xe
+        roi_y = int(y + h * (1 - plate_crop_ratio))
+        roi_h = int(h * plate_crop_ratio)
+        roi = frame[roi_y : roi_y + roi_h, x : x + w]
+        
+        if roi.size > 0:
+            # --- Code EasyOCR ---
+            result = reader.readtext(roi)
+            
+            for (bbox_ocr, text, prob) in result:
+                # Chỉ lấy các chữ có độ tin cậy tương đối (vd > 0.3)
+                if prob > 0.3:
+                    # 8. Vẽ label 'BXS' và biển số lên khung hình
+                    label_text = f"BXS: {text}"
+                    cv2.putText(frame, label_text, (x, y - 20),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    print(f"Phát hiện biển số tại ({x},{y}): {text} - Độ tin cậy: {prob}")
+
+    cv2.imshow('Vehicle Detection & BXS', frame)
+    # cv2.imshow('Mask', fgMask) # Xem mặt nạ chuyển động
+
+    # Nhấn 'q' để thoát
+    if cv2.waitKey(30) & 0xFF == ord('q'):
         break
 
 cap.release()
-cv.destroyAllWindows()
-print("[INFO] Finished.")
+cv2.destroyAllWindows()
