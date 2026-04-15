@@ -1,0 +1,59 @@
+Dòng 1-21 — Import thư viện
+Dòng 26-71 — Quản lý model weights
+_get_weights_dir() — Tìm thư mục chứa các file .onnx
+download_weights() — Nếu thiếu model → tự tải từ GitHub về
+
+
+Dòng 77-108 — Hàm tiện ích
+sort_polygon() (dòng 77) — Sắp xếp vùng chữ theo thứ tự trên→dưới, trái→phải (để đọc đúng thứ tự như con người)
+crop_image() (dòng 91) — Cắt vùng chữ bằng Perspective Transform (biến hình thang/nghiêng thành hình chữ nhật thẳng). Nếu ảnh dọc → xoay 90°
+
+
+Dòng 115-151 — Class CTCDecoder (Giải mã chữ tiếng Anh)
+Chứa bảng 97 ký tự (0-9, A-Z, a-z, ký tự đặc biệt)
+Thuật toán CTC: lấy argmax mỗi timestep → bỏ blank → gộp ký tự lặp
+Ví dụ: [H, H, blank, e, l, l, l, o] → "Hello"
+
+Dòng 158-292 — Class Detection (Phát hiện vùng chữ)
+Đây là bước 1 của pipeline. Trả lời câu hỏi: "Chữ nằm ở đâu trong ảnh?"
+
+ Dòng 299-343 — Class Classification (Phân loại hướng chữ)
+Bước 2: "Chữ có bị ngược 180° không?"
+
+Resize ảnh về 48×192 → chuẩn hóa → chạy classification.onnx
+Nếu label = "180" và score > 0.98 → cv2.rotate() xoay lại
+Xử lý theo batch 6 ảnh
+🇬🇧 Dòng 350-418 — Class EnglishRecognition (Nhận dạng tiếng Anh)
+Bước 3 (nếu lang='en'): "Ảnh này ghi chữ gì?"
+
+Resize ảnh về 48×320 → chạy recognition.onnx → dùng CTCDecoder giải mã
+Xử lý batch 6 ảnh, sắp xếp theo tỷ lệ width/height
+
+🇻🇳 Dòng 427-442 — Class VietOCRRecognition (Nhận dạng tiếng Việt)
+Bước 3 (nếu lang='vi'): dùng Transformer thay vì CTC
+def __call__(self, images):
+    for img in images:
+        pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        text, prob = self.engine.predict(pil_img)  # Gọi vietocr_onnx.py
+        Chuyển ảnh BGR → RGB → PIL → đưa vào VietOCROnnxEngine (file vietocr_onnx.py)
+
+⚙️ Dòng 449-465 — Khởi tạo model
+detection = Detection('detection.onnx')       # Load sẵn khi import
+classification = Classification('classification.onnx')  # Load sẵn
+
+def get_recognition(lang):   # Load theo yêu cầu (lazy loading)
+    if lang == 'vi': → VietOCRRecognition
+    if lang == 'en': → EnglishRecognition
+
+
+⭐ Dòng 472-558 — Hàm extract_text() (HÀM CHÍNH)
+Đây là hàm mà app.py của bạn gọi. Nó ghép tất cả lại:
+1. cv2.imread() đọc ảnh
+2. detection(frame) → tìm vùng chữ (polygons)
+3. sort_polygon() → sắp xếp thứ tự đọc
+4. crop_image() → cắt từng vùng
+5. classification() → xoay nếu ngược
+6. get_recognition(lang)() → nhận dạng chữ
+7. Trả về danh sách text (hoặc dict nếu return_dict=True)
+🖥️ Dòng 561-593 — Hàm main() (CLI)
+Cho phép chạy từ command line: python -m vncv image.png --lang vi --json

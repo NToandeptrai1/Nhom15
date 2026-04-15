@@ -1,0 +1,7 @@
+1. Trụ cột Công nghệ AI (The "Brain")
+    Hệ thống không chỉ dùng 1 model mà là một Pipeline (chuỗi xử lý) gồm 3 mô hình học sâu (Deep Learning) chuyên biệt:
+
+    Mô hình Định vị (Detection - detection.onnx): Sử dụng thuật toán AI để "quét" toàn bộ ảnh và tìm ra chính xác các vùng chứa chữ (bounding boxes). Nó không đọc chữ ngay mà chỉ xác định xem chữ nằm ở đâu.
+    Mô hình Phân loại hướng (Classification - classification.onnx): Rất thông minh ở chỗ nó tự nhận biết ảnh bị ngược hay nghiêng 180 độ để xoay lại cho đúng trước khi đọc.
+    Mô hình Nhận dạng (Recognition - VietOCR): Đây là "át chủ bài". Nó sử dụng kiến trúc Transformer (giống như công nghệ lõi của ChatGPT nhưng dành cho hình ảnh). Model này được huấn luyện (train) riêng trên hàng triệu mẫu chữ tiếng Việt, nên nó hiểu rất rõ các dấu câu và ký tự đặc biệt của tiếng Việt.
+2. "Sao nó biết đọc chữ tiếng Việt?" — Dùng kiến trúc Transformer Encoder-Decoder (giống ChatGPT nhưng cho ảnh→chữ): Encoder trích đặc trưng ảnh bằng CNN rồi biến đổi bằng Transformer, Decoder sinh từng ký tự một (greedy search) cho đến khi gặp token <eos>. Bảng từ vựng vocab.json chứa tất cả ký tự tiếng Việt có dấu.

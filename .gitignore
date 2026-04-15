@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 .venv311/
+cuoiky/test_ocr/venv_vncv/
 
 # Large files and models
 *.mp4

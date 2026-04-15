@@ -1,0 +1,40 @@
+Kế hoạch xây dựng giao diện Web OCR Tiếng Việt
+Mục tiêu là tạo ra một giao diện web thân thiện, hiện đại để sử dụng bộ công cụ OCR hiện có của bạn. Người dùng có thể upload ảnh, xem trước và lấy kết quả văn bản một cách dễ dàng.
+
+Lưu ý quan trọng cho người dùng
+IMPORTANT
+
+Ứng dụng sẽ sử dụng Flask làm backend.
+Server sẽ chạy tại localhost:5000.
+Tôi đã cài đặt flask và flask-cors vào môi trường venv_vncv của bạn.
+Các thay đổi dự kiến
+Backend
+[NEW] 
+app.py
+Tạo server Flask.
+Tạo API /ocr để:
+Nhận file ảnh từ giao diện.
+Chạy quy trình tiền xử lý ảnh (xoay ảnh, khử nhiễu...).
+Trích xuất chữ bằng thư viện vncv.
+Trả về kết quả dưới dạng JSON.
+Frontend
+[NEW] 
+templates/index.html
+Cấu trúc trang web với các thẻ HTML5 chuẩn SEO.
+Khu vực upload ảnh và hiển thị kết quả.
+[NEW] 
+static/css/style.css
+Thiết kế cao cấp (Premium Design) với hiệu ứng kính mờ (glassmorphism).
+Màu sắc hiện đại, hỗ trợ chế độ tối (Dark Mode).
+[NEW] 
+static/js/main.js
+Xử lý kéo thả file.
+Gửi yêu cầu OCR tới server và hiển thị kết quả mà không cần load lại trang.
+Câu hỏi
+Bạn có muốn thêm tính năng "Lưu kết quả thành file .txt" không?
+Bạn thích tông màu gì nhất (Xanh neon, Trắng tối giản, hay Tím huyền ảo)?
+Kế hoạch kiểm tra
+Chạy server Flask.
+Mở trình duyệt tại localhost:5000.
+Thử upload file hinh1.jpg để xem chữ có trích xuất đúng không.
+Kiểm tra giao diện trên điện thoại/máy tính để đảm bảo độ chuẩn.

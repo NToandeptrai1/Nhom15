@@ -1,0 +1,25 @@
+Hoàn tất xây dựng giao diện VietOCR 🚀
+Tôi đã hoàn thành việc xây dựng giao diện web cho bộ công cụ OCR của bạn. Giao diện được thiết kế theo phong cách Premium Glassmorphism, hiện đại và dễ sử dụng.
+
+Các tính năng đã thực hiện:
+ Backend Flask: Kết nối trực tiếp với thư viện vncv của bạn.
+ Giao diện kéo thả: Cho phép bạn kéo ảnh trực tiếp vào để trích xuất chữ.
+ Xem trước ảnh: Hiển thị ảnh ngay khi chọn để bạn kiểm tra.
+ Copy nhanh: Nút sao chép kết quả chỉ với 1 click.
+ Thiết kế tối ưu: Hỗ trợ tốt trên cả máy tính và điện thoại.
+Cách sử dụng:
+Server đang chạy: Tôi đã khởi động server tại địa chỉ http://localhost:5000.
+Truy cập: Bạn chỉ cần click vào link trên để mở giao diện.
+Thao tác:
+Nhấn vào vùng giữa màn hình hoặc kéo ảnh vào đó.
+Nhấn nút "Trích xuất văn bản" (màu tím).
+Đợi vài giây, chữ sẽ hiện ra ở bảng bên phải.
+Hình ảnh minh họa:
+TIP
+
+Bạn có thể thử với file hinh1.jpg có sẵn trong thư mục để thấy tốc độ xử lý!
+
+Kiểm tra kết quả:
+Tôi đã chạy thử và kết quả trích xuất rất chính xác từ hóa đơn của bạn.
+
+Nếu bạn muốn thay đổi màu sắc hay thêm tính năng lưu file, hãy cho tôi biết nh

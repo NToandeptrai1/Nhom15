@@ -1,0 +1,75 @@
+1Dòng 1-38 — Import & Giới thiệu
+Dựa trên project VietOCR (OCR tiếng Việt nổi tiếng)
+Dùng onnxruntime để chạy model AI thay vì PyTorch (nhẹ hơn nhiều)
+
+2 🖼️ Dòng 45-79 — Tiền xử lý ảnh
+resize(w, h, ...) (dòng 45):
+
+Tính lại chiều rộng ảnh, giữ tỷ lệ gốc
+Round lên bội số 10 (yêu cầu của model)
+Giới hạn: chiều cao = 32px, chiều rộng trong [32, 512]
+process_image(image) (dòng 58):
+Ảnh PIL → Convert RGB → Resize giữ tỷ lệ → Transpose (H,W,C)→(C,H,W) → Chia 255
+Output: numpy array (3, 32, W) float32, giá trị [0, 1]
+process_input(image) (dòng 73):
+Thêm batch dimension → (1, 3, 32, W) — sẵn sàng đưa vào model ONNX
+
+📖 Dòng 86-122 — Class VocabONNX (Bảng từ vựng)
+Đây là "từ điển" để dịch số → ký tự tiếng Việt
+# 4 token đặc biệt:
+PAD = 0   # Padding (đệm)
+SOS = 1   # Start of Sequence (bắt đầu câu)
+EOS = 2   # End of Sequence (kết thúc câu)
+MASK = 3  # Mask
+
+# Từ index 4 trở đi: các ký tự thật
+# Ví dụ: 4='a', 5='á', 6='à', 7='ả', ... 'ă','â','đ','ê','ô','ơ','ư'...
+
+Đọc từ vocab.json — chứa toàn bộ ký tự tiếng Việt có dấu
+decode(ids): Nhận chuỗi số [1, 45, 67, 23, 89, 2] → bỏ <sos>, dừng tại <eos> → ghép ký tự → "Nguyễn"
+
+Dòng 129-341 — Class VietOCROnnxEngine (Engine chính)
+Đây là class quan trọng nhất — điều khiển toàn bộ quá trình nhận dạng chữ Việt.
+Khởi tạo (dòng 162-183):
+def __init__(self, onnx_dir, seq_modeling="transformer"):
+    self.enc_sess = InferenceSession("model_encoder.onnx")  # Load Encoder
+    self.dec_sess = InferenceSession("model_decoder.onnx")  # Load Decoder
+    self.vocab = VocabONNX("vocab.json")                     # Load từ vựng
+
+run_encoder() (dòng 195-205) — Bước 1: Trích đặc trưng ảnh
+Ảnh (1, 3, 32, W) → model_encoder.onnx → memory (T, 1, D)
+CNN backbone: quét ảnh → tạo feature map (đặc trưng hình ảnh)
+Transformer Encoder: biến feature map thành chuỗi vector memory
+T = số vị trí đặc trưng (phụ thuộc chiều rộng ảnh)
+D = chiều embedding (thường 256 hoặc 512)
+run_decoder_transformer() (dòng 207-218) — Bước 2: Sinh ký tự
+tgt_inp (chuỗi token đã sinh) + memory → model_decoder.onnx → xác suất ký tự tiếp theo
+⭐ predict_transformer() (dòng 237-283) — Greedy Decoding
+Đây là thuật toán cốt lõi — giải thích cách model "đọc" chữ:
+Bước 0: tokens = [<sos>]              → "Bắt đầu đọc"
+Bước 1: Decoder([<sos>]) → "N"        → tokens = [<sos>, N]
+Bước 2: Decoder([<sos>, N]) → "g"     → tokens = [<sos>, N, g]
+Bước 3: Decoder([<sos>, N, g]) → "u"  → tokens = [<sos>, N, g, u]
+...
+Bước 6: Decoder(...) → "ễ"            → tokens = [..., ễ]
+Bước 7: Decoder(...) → "n"            → tokens = [..., n]
+Bước 8: Decoder(...) → <eos>          → DỪNG! Kết quả: "Nguyễn"
+
+
+predict_seq2seq() (dòng 287-323) — Phiên bản cũ (GRU)
+Tương tự nhưng dùng GRU (Gated Recurrent Unit) thay Transformer
+Decoder chạy từng bước 1 (không cần cả chuỗi)
+
+
+predict() (dòng 327-341) — Unified API
+def predict(self, image):
+    img_np = process_input(image)  # Tiền xử lý
+    if self.seq_modeling == "transformer":
+        return self.predict_transformer(img_np)
+    else:
+        return self.predict_seq2seq(img_np)
+
+
+🔬 Dòng 348-445 — So sánh & CLI
+compare_with_pytorch() — So sánh kết quả ONNX vs PyTorch gốc (dùng để test)
+main() — Chạy từ command line

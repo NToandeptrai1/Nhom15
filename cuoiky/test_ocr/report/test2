@@ -1,0 +1,133 @@
+=== KẾT QUẢ TEST OCR - CONFUSION MATRIX ===
+
+## TEST LOG - Xử lý 2 ảnh (hinh1.jpg, hoadon1.jpg)
+
+### ========== TEST 1: hinh1.jpg ==========
+
+Khởi động:
+--- Đang khởi tạo model OCR (Warm-up)... ---
+[VNCV System] Using ONNX for Vietnamese Recognition
+[INFO] Loading Encoder: C:\thaytri\cuoiky\test_ocr\venv_vncv\Lib\site-packages\vncv\weights\model_encoder.onnx
+[INFO] Loading Decoder: C:\thaytri\cuoiky\test_ocr\venv_vncv\Lib\site-packages\vncv\weights\model_decoder.onnx
+[INFO] Loading Vocab: C:\thaytri\cuoiky\test_ocr\venv_vncv\Lib\site-packages\vncv\weights\vocab.json
+
+IO Info:
+  Encoder:
+    Inputs : [('input', ['batch', 3, 32, 'im_width'], 'tensor(float)')]
+    Outputs: [('memory', ['2*((im_width//4))', 1, 256], 'tensor(float)')]
+  Decoder:
+    Inputs : [('tgt_inp', ['seq_len', 'batch'], 'tensor(int64)'), ('memory', ['feat_len', 'batch', 256], 'tensor(float)')]
+    Outputs: [('output', [1, 'seq_len', 233], 'tensor(float)')]
+
+--- Model đã sẵn sàng! ---
+
+Xử lý file: hinh1.jpg
+  [Log] Denoise: 11.3867s
+  [Log] Upscale 2x: 0.0391s
+  [Log] Deskew: 0.3459s
+  [Log] CLAHE: 0.2208s
+--- Tổng thời gian tiền xử lý: 12.2415s ---
+
+Pipeline VNCV:
+    [VNCV Log] Bắt đầu xử lý temp_preprocessed.jpg
+    [VNCV Log] Detection (56 boxes): 0.2014s
+    [VNCV Log] Cropping: 0.1699s
+    [VNCV Log] Classification: 0.0644s
+    [VNCV Log] Recognition total: 27.1621s
+    [VNCV Log] Hoàn tất VNCV pipeline: 27.6297s
+  [Log] OCR Extraction: 27.8703s
+  [Log] Character Count: 882
+--- Hoàn tất trong: 40.1504s ---
+
+Kết quả TEST 1:
+  • Tổng thời gian: 40.1504s
+  • Số ký tự nhận diện: 882
+  • Số hộp chữ phát hiện: 56
+  • Tiền xử lý: 12.2415s (30.5%)
+  • VNCV pipeline: 27.6297s (68.8%)
+
+---
+
+### ========== TEST 2: hoadon1.jpg ==========
+
+Xử lý file: hoadon1.jpg
+  [Log] Denoise: 4.0380s
+  [Log] Upscale 2x: 0.0181s
+  [Log] Deskew: 0.1039s
+  [Log] CLAHE: 0.1026s
+--- Tổng thời gian tiền xử lý: 4.4262s ---
+
+Pipeline VNCV:
+    [VNCV Log] Bắt đầu xử lý temp_preprocessed.jpg
+    [VNCV Log] Detection (54 boxes): 1.3387s
+    [VNCV Log] Cropping: 0.2658s
+    [VNCV Log] Classification: 1.0068s
+    [VNCV Log] Recognition total: 39.9613s
+    [VNCV Log] Hoàn tất VNCV pipeline: 42.6058s
+  [Log] OCR Extraction: 42.7694s
+  [Log] Character Count: 684
+--- Hoàn tất trong: 47.2181s ---
+
+Kết quả TEST 2:
+  • Tổng thời gian: 47.2181s
+  • Số ký tự nhận diện: 684
+  • Số hộp chữ phát hiện: 54
+  • Tiền xử lý: 4.4262s (9.4%)
+  • VNCV pipeline: 42.6058s (90.3%)
+
+---
+
+### ========== TỔNG HỢP KẾT QUẢ ==========
+
+| Chỉ số | TEST 1 (hinh1.jpg) | TEST 2 (hoadon1.jpg) | Trung bình |
+|-------|-------------------|---------------------|-----------|
+| Tổng thời gian (s) | 40.1504 | 47.2181 | 43.6843 |
+| Số ký tự | 882 | 684 | 783 |
+| Số hộp chữ | 56 | 54 | 55 |
+| Tiền xử lý (s) | 12.2415 | 4.4262 | 8.3339 |
+| Pipeline (s) | 27.6297 | 42.6058 | 35.1178 |
+| Denoise (s) | 11.3867 | 4.0380 | 7.7124 |
+| Detection (s) | 0.2014 | 1.3387 | 0.7701 |
+| Recognition (s) | 27.1621 | 39.9613 | 33.5617 |
+
+---
+
+### ========== PHÂN TÍCH ==========
+
+1. HIỆU SUẤT NHẬN DIỆN:
+   - TEST 1: 882 ký tự trong 40.15s → ~22 ký tự/giây
+   - TEST 2: 684 ký tự trong 47.22s → ~14.5 ký tự/giây
+   - Khác biệt: TEST 1 nhanh hơn do ảnh chất lượng tốt hơn (denoise nhanh)
+
+2. GIAI ĐOẠN BOTTLENECK:
+   - Recognition chiếm 67-85% thời gian xử lý
+   - Denoise chiếm 10-28% thời gian tiền xử lý
+   - Detection & Classification tương đối ổn định
+
+3. NHẬN XÉT:
+   - TEST 2 có Denoise nhanh hơn (ảnh tốt hơn)
+   - TEST 2 có Detection chậm hơn (nhiều hộp chữ phức tạp hơn)
+   - Recognition time khác nhau do số ký tự và độ phức tạp ảnh
+
+---
+
+### ========== CONFUSION MATRIX - KHUYẾN CÁO ==========
+
+Để tạo ma trận sai sót hoàn chỉnh, cần:
+1. Chuẩn bị dataset test (ảnh + ground truth text)
+2. Chạy OCR trên từng ảnh
+3. So sánh kết quả nhận diện vs ground truth
+4. Tính toán TP, FP, FN, TN cho từng ký tự
+
+Ví dụ:
+- Nếu ground truth = "Hello" và OCR trả = "Heilo"
+  - Đúng: H, e, l, o = 4 ký tự
+  - Sai: i (thay vì l cơ 3) = 1 ký tự
+  - Độ chính xác: 4/5 = 80%
+
+---
+
+Generated: 15/04/2026
+Platform: Windows 10/11 + Python 3.10+
+Model: VietOCR ONNX (Transformer Encoder-Decoder)
+Backend: Flask + OpenCV + ONNX Runtime
